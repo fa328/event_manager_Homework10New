@@ -8,6 +8,9 @@
 5. fix test_update_user_email_access_denied error #6
 
 ## Dockerhub Image
+![image](https://github.com/user-attachments/assets/0cc11f3c-fbcc-4f7e-a65f-17adb0794ded)
+![image](https://github.com/user-attachments/assets/c1e8af6c-be6d-4d78-baef-709cbb0ee2a2)
+
 
 ## Reflection
 This assignment was incredibly interesting and provided me with valuable experience in debugging and learning through trial and error. I believe the project addresses a real-world problem, and it offers a great opportunity to understand what to expect in similar situations while also improving students' skills. By working through this project, students are not only encouraged to fix errors in the code but also to learn from the mistakes they make along the way. I found the debugging process particularly challenging because, at times, I wasn't sure if I was truly fixing the error or unintentionally creating new ones. Despite this, the experience helped me develop a deeper understanding of problem-solving and the iterative nature of debugging.
