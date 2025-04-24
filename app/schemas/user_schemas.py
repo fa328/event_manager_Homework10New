@@ -1,5 +1,5 @@
 from builtins import ValueError, any, bool, str
-from pydantic import BaseModel, EmailStr, Field, validator, root_validator
+from pydantic import BaseModel, EmailStr, Field, validator, HttpUrl
 from typing import Optional, List
 from datetime import datetime
 from enum import Enum
@@ -8,13 +8,16 @@ import re
 
 from app.utils.nickname_gen import generate_nickname
 
+
 class UserRole(str, Enum):
     ANONYMOUS = "ANONYMOUS"
     AUTHENTICATED = "AUTHENTICATED"
     MANAGER = "MANAGER"
     ADMIN = "ADMIN"
 
+
 def validate_url(url: Optional[str]) -> Optional[str]:
+    """Helper function to validate URL format."""
     if url is None:
         return url
     url_regex = r'^https?:\/\/[^\s/$.?#].[^\s]*$'
@@ -22,9 +25,10 @@ def validate_url(url: Optional[str]) -> Optional[str]:
         raise ValueError('Invalid URL format')
     return url
 
+
 class UserBase(BaseModel):
     email: EmailStr = Field(..., example="john.doe@example.com")
-    nickname: Optional[str] = Field(None, min_length=3, max_length=50, pattern=r'^[\w-]+$', example=generate_nickname())
+    nickname: Optional[str] = Field(None, min_length=3, pattern=r'^[\w-]+$', example=generate_nickname())
     first_name: Optional[str] = Field(None, example="John")
     last_name: Optional[str] = Field(None, example="Doe")
     bio: Optional[str] = Field(None, example="Experienced software developer specializing in web applications.")
@@ -32,62 +36,65 @@ class UserBase(BaseModel):
     linkedin_profile_url: Optional[str] = Field(None, example="https://linkedin.com/in/johndoe")
     github_profile_url: Optional[str] = Field(None, example="https://github.com/johndoe")
 
-    _validate_urls = validator('profile_picture_url', 'linkedin_profile_url', 'github_profile_url', pre=True, allow_reuse=True)(validate_url)
+    # Apply the URL validator to profile-related URLs
+    _validate_urls = validator(
+        'profile_picture_url', 'linkedin_profile_url', 'github_profile_url', pre=True, allow_reuse=True
+    )(validate_url)
 
     class Config:
         from_attributes = True
 
+
 class UserCreate(UserBase):
-    email: EmailStr = Field(..., example="john.doe@example.com")
-    password: str = Field(..., example="Secure*1234", min_length=8, max_length=128)
+    password: str = Field(..., example="Secure*1234")
 
-    @validator('password')
-    def validate_password(cls, v):
-        # Ensure the password contains at least one uppercase letter, one digit, and one special character
-        if not re.search(r'[A-Z]', v):
-            raise ValueError('Password must contain at least one uppercase letter.')
-        if not re.search(r'[0-9]', v):
-            raise ValueError('Password must contain at least one digit.')
-        if not re.search(r'[!@#$%^&*(),.?":{}|<>]', v):
-            raise ValueError('Password must contain at least one special character.')
-        return v
 
-class UserUpdate(UserBase):
-    email: Optional[EmailStr] = Field(None, example="john.doe@example.com")
-    nickname: Optional[str] = Field(None, min_length=3, max_length=50, pattern=r'^[\w-]+$', example="john_doe123")
-    first_name: Optional[str] = Field(None, example="John")
-    last_name: Optional[str] = Field(None, example="Doe")
-    bio: Optional[str] = Field(None, example="Experienced software developer specializing in web applications.")
-    profile_picture_url: Optional[str] = Field(None, example="https://example.com/profiles/john.jpg")
-    linkedin_profile_url: Optional[str] = Field(None, example="https://linkedin.com/in/johndoe")
-    github_profile_url: Optional[str] = Field(None, example="https://github.com/johndoe")
+class UserUpdate(BaseModel):
+    email: Optional[EmailStr] = None
+    nickname: Optional[str] = None
+    first_name: Optional[str] = None
+    last_name: Optional[str] = None
+    bio: Optional[str] = None
+    profile_picture_url: Optional[HttpUrl] = None
+    linkedin_profile_url: Optional[HttpUrl] = None
+    github_profile_url: Optional[HttpUrl] = None
 
-    @root_validator(pre=True)
-    def check_at_least_one_value(cls, values):
-        if not any(values.values()):
-            raise ValueError("At least one field must be provided for update")
-        return values
+    # Validator for nickname to ensure it's alphanumeric, underscores, or hyphens
+    @validator('nickname')
+    def validate_nickname(cls, value):
+        if value and not re.match(r'^[\w-]+$', value):
+            raise ValueError('Nickname can only contain letters, numbers, underscores, and hyphens.')
+        return value
+
 
 class UserResponse(UserBase):
     id: uuid.UUID = Field(..., example=uuid.uuid4())
     role: UserRole = Field(default=UserRole.AUTHENTICATED, example="AUTHENTICATED")
-    email: EmailStr = Field(..., example="john.doe@example.com")
-    nickname: Optional[str] = Field(None, min_length=3, max_length=50, pattern=r'^[\w-]+$', example=generate_nickname())
     is_professional: Optional[bool] = Field(default=False, example=True)
+
+    class Config:
+        from_attributes = True
+
 
 class LoginRequest(BaseModel):
     email: str = Field(..., example="john.doe@example.com")
-    password: str = Field(..., example="Secure*1234", min_length=8, max_length=128)
+    password: str = Field(..., example="Secure*1234")
+
 
 class ErrorResponse(BaseModel):
     error: str = Field(..., example="Not Found")
     details: Optional[str] = Field(None, example="The requested resource was not found.")
 
+
 class UserListResponse(BaseModel):
     items: List[UserResponse] = Field(..., example=[{
-        "id": uuid.uuid4(), "nickname": generate_nickname(), "email": "john.doe@example.com",
-        "first_name": "John", "bio": "Experienced developer", "role": "AUTHENTICATED",
-        "last_name": "Doe", "bio": "Experienced developer", "role": "AUTHENTICATED",
+        "id": uuid.uuid4(), 
+        "nickname": generate_nickname(), 
+        "email": "john.doe@example.com",
+        "first_name": "John", 
+        "last_name": "Doe", 
+        "bio": "Experienced developer", 
+        "role": "AUTHENTICATED",
         "profile_picture_url": "https://example.com/profiles/john.jpg", 
         "linkedin_profile_url": "https://linkedin.com/in/johndoe", 
         "github_profile_url": "https://github.com/johndoe"
