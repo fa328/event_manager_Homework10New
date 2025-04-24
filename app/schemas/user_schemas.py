@@ -1,4 +1,3 @@
-from builtins import ValueError, any, bool, str
 from pydantic import BaseModel, EmailStr, Field, validator, HttpUrl
 from typing import Optional, List
 from datetime import datetime
@@ -46,7 +45,7 @@ class UserBase(BaseModel):
 
 
 class UserCreate(UserBase):
-    password: str = Field(..., example="Secure*1234")
+    password: str = Field(..., example="Secure*1234", min_length=8, max_length=50)  # Updated password max length to 50
 
 
 class UserUpdate(BaseModel):
