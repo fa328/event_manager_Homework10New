@@ -26,12 +26,10 @@ jobs:
         options: --health-cmd pg_isready --health-interval 10s --health-timeout 5s --health-retries 5
     steps:
       - uses: actions/checkout@v4
-      
       - name: Set up Python ${{ matrix.python-version }}
         uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
-          
       - name: Cache Python packages
         uses: actions/cache@v4
         with:
@@ -39,15 +37,13 @@ jobs:
           key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
           restore-keys: |
             ${{ runner.os }}-pip-
-      
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
-          
       - name: Run tests with Pytest
         env:
-          DATABASE_URL: postgresql+asyncpg://user:password@localhost:5432/myappdb  # Configure the DATABASE_URL environment variable for tests
+          DATABASE_URL: postgresql+asyncpg://user:password@localhost:5432/myappdb  # Set up DATABASE_URL for the tests
         run: pytest
 
   build-and-push-docker:
@@ -56,30 +52,58 @@ jobs:
     environment: production
     steps:
       - uses: actions/checkout@v4
-      
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
-      
       - name: Log in to DockerHub
         uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
-          
       - name: Build and push Docker image
         uses: docker/build-push-action@v5
         with:
           push: true
-          tags: fa328/homework10:${{ github.sha }} # Uses the Git SHA for tagging
-          platforms: linux/amd64,linux/arm64 # Multi-platform support
-          cache-from: type=registry,ref=fa328/homework10:cache
-          cache-to: type=inline,mode=max
-          
-      - name: Scan the Docker image
+          tags: fa328/homework10:${{ github.sha }} # Tag Docker image with the commit SHA
+          platforms: linux/amd64,linux/arm64 # Support for multiple architectures
+          cache-from: type=registry,ref=fa328/homework10:cache # Cache image for faster builds
+          cache-to: type=inline,mode=max # Maximize cache usage for faster subsequent builds
+      - name: Scan the Docker image for vulnerabilities
         uses: aquasecurity/trivy-action@master
         with:
-          image-ref: 'fa328/homework10:${{ github.sha }}'
+          image-ref: 'fa328/homework10:${{ github.sha }}'  # Use the commit SHA to refer to the built image
           format: 'table'
-          exit-code: '1' # Fail the job if vulnerabilities are found
+          exit-code: '1'  # Fail if critical or high vulnerabilities are found
           ignore-unfixed: true
           severity: 'CRITICAL,HIGH'
+
+  pull-docker-image:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Pull the Docker image (Using the commit SHA tag)
+        run: |
+          docker pull fa328/homework10:${{ github.sha }}  # Pull the image tagged with the commit SHA
+          
+  # Optional: Add 'latest' tag for easier access if desired
+  build-and-push-docker-with-latest:
+    needs: test
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      - name: Log in to DockerHub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          push: true
+          tags: 
+            - fa328/homework10:${{ github.sha }}  # Tag with commit SHA
+            - fa328/homework10:latest             # Optionally tag with 'latest'
+          platforms: linux/amd64,linux/arm64 # Support for multiple architectures
+          cache-from: type=registry,ref=fa328/homework10:cache # Cache image for faster builds
+          cache-to: type=inline,mode=max # Maximize cache usage for faster subsequent builds
